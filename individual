@@ -1,0 +1,72 @@
+import java.util.ArrayList;
+
+public class inidival {
+    //个体类，对于一个个体，应该具有浮点数组，二进制数组,
+    //对于多目标的个体我还是觉得使用浮点数作为染色体会更好
+    //static int n1=10;//基因的长度
+    static int dimension=30; //维度
+    double distance;//拥挤度
+    //static final int InteNum=1024;//间隔数，也就是精度
+    static final boolean debug=false;//debug参数
+    double[] dou1;//浮点基因
+    //String[] bin1;//二进制基因
+    int nq;//个体被支配的次数数
+    ArrayList<inidival> Sp;//个体支配个体的集合
+    int rank;//个体的帕累托的等级
+    double fitness1;//函数1的适应值
+    double fitness2;//函数2的适应值
+    double high=1.0;
+    double low=0.0;
+
+    public inidival(){
+        this.distance=0;
+        this.init();
+        this.nq=0;
+        this.Sp=new ArrayList<>();
+    }
+    public inidival(int a ){
+        //这是初始化子种群的函数，为了区分，我添加了一个无效参数
+        this.distance=0;
+        //this.bin1=new String[dimension];
+        this.dou1=new double[dimension];
+        //this.bin1="";
+        this.fitness2=0;
+        this.fitness1=0;
+        //this.rank=0;
+        this.nq=0;
+        this.Sp=new ArrayList<>();
+    }
+    public void init(){
+        this.init1();
+        this.calF();
+    }
+
+    public void init1(){
+        //初始化操作
+        dou1=new double[dimension];
+        for (int i=0;i<dimension;i++) {
+            dou1[i] = Math.random()*(high-low);
+            if (dou1[i]==low){
+                dou1[i]+=0.0001;
+            }else if (dou1[i]==high){
+                dou1[i]-=0.0001;
+            }
+        }
+    }
+
+    public void calF(){
+        //计算适应值的函数
+        //0.371170 0.058478 1.058478
+        //这里的g和h不合理啊。。。。
+        fitness1=dou1[0];
+        double g = 1, sum = 0;
+        for (int i = 1; i < dimension; i++) {
+            g += dou1[i];
+        }
+        sum += 9 * (sum / (dimension - 1));
+        g += sum;
+        fitness2 = g*(1 - Math.sqrt(dou1[0] / g));
+    }
+
+
+}
