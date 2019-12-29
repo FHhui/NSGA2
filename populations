@@ -1,0 +1,342 @@
+import java.util.*;
+/*
+ * author:FHhui
+ * description:NSGA-2 for ZDT1多目标优化问题
+ *
+ * */
+public class populations {
+
+    //种群类,在这里进行种群级别的具体操作
+    //这里的方法应该是以特定的数组作为参数的。
+    //我感觉我已经死在了内存这一块。。。mdzz，一个令人绝望的故事
+    //函数沉迷陷入小值,迷失在小值里面，这就很让人绝望。
+
+    private static final boolean debug=false;//debug参数
+    private int N=100;//种群的数目
+    private double pc=0.5;//发生交叉行为的概率
+    private double pm=0.1;//发生变异性为的概率
+    private double BestY1;//函数1的最佳Y
+    private double MinY1;//函数1的最小Y
+    private double BestY2;//函数2的最佳Y
+    private double MinY2;//函数2的最小Y
+    private static inidival[] pop;//种群的个体
+    private static inidival[] Cpop;//子种群
+    private static inidival[] Ppop;//交配种群
+    private static inidival[] p1;//函数1的排序列表
+    private static inidival[] p2;//函数2的排序列表
+    private int round=1000;//迭代次数
+    private double r=0.8;//随机数
+    private double k=0.5;//变异的步长
+
+    public populations(){
+        init();
+    }
+    private  void init(){
+        p1=new inidival[N];
+        p2=new inidival[N];
+        pop=new inidival[N];
+        Cpop=new inidival[N];
+        Ppop=new inidival[N];
+        //初始化操作，将种群初始化，并将进行非支配排序
+        BestY1=0;
+        MinY1=Integer.MAX_VALUE;
+        BestY2=0;
+        //MinY1=Integer.MAX_VALUE;
+        for (int i=0;i<N;i++){
+            pop[i]=new inidival();//对种群中的每一个个体进行初始化操作
+        }
+    }
+    private  void choose(){
+        if(debug) System.out.println("程序开始选择");
+        for(int i=0;i<N;i++){
+            //锦标赛选择
+            Cpop[i]=new inidival(1);
+            int m,n;
+            m=(int)(Math.random()*N);
+            n=(int)(Math.random()*N);
+            if(pop[m].rank<(pop[n].rank)){
+                Ppop[i]=pop[m];//取帕累托等级小的
+            }else if(pop[m].rank==pop[n].rank){
+                //如果帕累托等级相同的话，就比较距离
+                Ppop[i]=pop[m].distance>pop[n].distance?pop[m]:pop[n];
+            }else{
+                Ppop[i]=pop[n];
+            }
+        }
+
+        //这里不是一个三目运算符式子就可以决定的，因为拥挤度的存在
+        //选择生成新的父本并把他放入到交配种群中
+
+    }
+    private inidival[] fast_Nondominated_sort(inidival[] popx){
+        if(debug) System.out.println("程序开始快速非支配排序");
+        ArrayList<ArrayList<inidival>> F=new ArrayList<>();//帕累托等级列表
+        //快速非支配排序，
+        ArrayList<inidival> fx=new ArrayList<>();//x等级的列表
+        for(int i=0;i<N;i++){
+            popx[i].nq=0;
+            for (int j=0;j<N;j++){
+                if (j!=i){
+                    if (popx[i].fitness1<=popx[j].fitness1 && popx[i].fitness2<=popx[j].fitness2){//两个函数均小于
+                        //支配关系 i支配j
+                        if (popx[i].fitness1==popx[j].fitness1 && popx[i].fitness2==popx[j].fitness2){
+                            //对于相等的来说，没有任何操作才是对的
+                        }else{
+                            popx[i].Sp.add(popx[j]);}
+                    }else if(popx[i].fitness1>=popx[j].fitness1 && popx[i].fitness2>=popx[j].fitness2){//两个函数均大于
+                        //被支配关系 i被j支配
+                        if (popx[i].fitness1==popx[j].fitness1 && popx[i].fitness2==popx[j].fitness2){
+                            //对于相等的来说，没有任何操作才是对的
+                        }else{
+                            popx[i].nq++;
+                        }
+
+                    }
+                }
+
+            }
+            if (popx[i].nq==0){//如果没有人可支配
+                popx[i].rank=1;
+                fx.add(popx[i]);
+            }
+        }
+        F.add(fx);
+        int i=0;
+        while(F.get(i).size() !=0){
+            //开始一层一层的去掉帕累托层进行分级
+            if(debug) System.out.println("程序开始快速帕累托分级");
+            fx=new ArrayList<>();
+            for (int j=0;j<F.get(i).size();j++){
+                //实际在整个种群中的位置参数
+                for (int m=0;m<F.get(i).get(j).Sp.size();m++){
+                    inidival h=F.get(i).get(j).Sp.get(m);
+                    h.nq=h.nq-1;//相当于第一个被删去了。
+                    if (h.nq==0){
+                        h.rank=i+2;
+                        fx.add(h);//新的一轮开始了
+                    }
+                }
+            }
+            if(debug) System.out.println(i);
+            F.add(fx);
+            i++;
+        }
+        return popx;
+    }
+    //    private void paixu(inidival[] popx){
+//        //排序操作，对p1，p2进行排序
+//        p1=new inidival[popx.length];
+//        p2=new inidival[popx.length];
+//        for(int i=0;i<popx.length;i++) p1[i]=popx[i];
+//        for(int i=0;i<popx.length;i++) p2[i]=popx[i];
+//        if(debug) System.out.println("程序开始冒泡排序");
+//        boolean flag=true;
+//        for (int i=0;i<popx.length-1;i++){
+//            //利用冒泡算法进行的排序，
+//            // 如果要想提高速度可以修改为快速排序
+//            flag=true;
+//            for (int j=0;j<popx.length-i-1;j++){
+//                if (p1[j].fitness1 > p1[j+1].fitness1){
+//                    // 交换位置
+//                    inidival temp = p1[j];
+//                    p1[j] = p1[j+1];
+//                    p1[j+1] = temp;
+//                    //如果发生交换则flag改为false
+//                    flag = false;
+//                }
+//            }
+//            if (flag)   break;
+//        }
+//        BestY1=p1[p1.length-1].fitness1;
+//        MinY1=p1[0].fitness1;
+//        flag=true;
+//        for (int i=0;i<popx.length-1;i++){
+//            //利用冒泡算法进行的排序，
+//            // 如果要想提高速度可以修改为快速排序
+//            flag=true;
+//            for (int j=0;j<popx.length-i-1;j++){
+//                if (p2[j].fitness2 > p2[j+1].fitness2){
+//                    // 交换位置
+//                    inidival temp = p2[j];
+//                    p2[j] = p2[j+1];
+//                    p2[j+1] = temp;
+//                    //如果发生交换则flag改为false
+//                    flag = false;
+//                }
+//            }
+//            if (flag)   break;
+//        }
+//        BestY2=p2[p2.length-1].fitness2;
+//        MinY2=p2[0].fitness2;
+//    }
+    private inidival[] calCrowing(inidival[] popx){
+        //计算种群拥挤度的方法
+        //计算种群拥挤度需要一个排序后的列表
+        for (int i=0;i<popx.length;i++){
+            //利用冒泡算法进行的排序，
+            // 如果要想提高速度可以修改为快速排序
+            for (int j=0;j<popx.length-i-1;j++){
+                if (popx[j].fitness1 > popx[j+1].fitness1){
+                    // 交换位置
+                    inidival temp = popx[j];
+                    popx[j] = popx[j+1];
+                    popx[j+1] = temp;
+                }
+            }
+        }
+        BestY1=popx[popx.length-1].fitness1;
+        MinY1=popx[0].fitness1;
+        popx[popx.length-1].distance=popx[0].distance=Integer.MAX_VALUE;
+        for(int i=1;i<popx.length-1;i++){
+            popx[i].distance=0;
+            //计算函数1拥挤度的部分
+            popx[i].distance=(popx[i+1].fitness1-popx[i-1].fitness1)/(BestY1-MinY1);//函数1的拥挤度计算
+        }
+        for (int i=0;i<popx.length;i++){
+            //利用冒泡算法进行的排序，
+            // 如果要想提高速度可以修改为快速排序
+            for (int j=0;j<popx.length-i-1;j++){
+                if (popx[j].fitness2 > popx[j+1].fitness2){
+                    // 交换位置
+                    inidival temp = popx[j];
+                    popx[j] = popx[j+1];
+                    popx[j+1] = temp;
+                    //如果发生交换则flag改为false
+                }
+            }
+        }
+        popx[0].distance=popx[popx.length-1].distance=Integer.MAX_VALUE;
+        BestY2=popx[popx.length-1].fitness2;
+        MinY2=popx[0].fitness2;
+        for(int i=1;i<popx.length-1;i++){
+            //计算拥挤度的部分
+            popx[i].distance+=(popx[i+1].fitness2-popx[i-1].fitness2)/(BestY2-MinY2);//函数1的拥挤度计算
+        }
+        return popx;
+    }
+    private void Crosser(){
+        //这里是交叉操作，对两个基因组的基因分别进行交叉
+        for (int i=0;i<N-1;i++) {
+            //随机选取两个父代
+            for (int j = 0; j < inidival.dimension; j++) {
+                //对不同的维度x进行求解
+                if (Math.random() < pc) {
+                    double a=Math.random()*r;
+                    double b=Math.random()*r;
+                    Cpop[i].dou1[j]=Ppop[i+1].dou1[j]*b+Ppop[i].dou1[j]*(1-a);
+                    Cpop[i+1].dou1[j]=Ppop[i].dou1[j]*a+Ppop[i+1].dou1[j]*(1-b);
+                    if (Cpop[i].dou1[j]>=Cpop[i].high){
+                        Cpop[i].dou1[j]=Cpop[i].high-0.01;
+                    }else if(Cpop[i].dou1[j]<=Cpop[i].low){
+                        Cpop[i].dou1[j]=Cpop[i].low+0.01;
+                    }
+                    if (Cpop[i+1].dou1[j]>=Cpop[i+1].high){
+                        Cpop[i+1].dou1[j]=Cpop[i+1].high-0.01;
+                    }else if(Cpop[i+1].dou1[j]<=Cpop[i+1].low){
+                        Cpop[i+1].dou1[j]=Cpop[i+1].low+0.01;
+                    }
+                }
+               // System.out.println("程序开始交叉");
+            }
+        }
+    }
+    private void Mutation(){
+        //变异操作，分别对两个基因型固定位置的基因进行变异操作
+        for(int i=0;i<N;i++){
+            for (int j=0;j<inidival.dimension;j++){
+                //对不同维度的x进行变异操作
+                if(Math.random()<pm){
+                    int flag=(int)(Math.random()*2);
+                    if (flag==0){
+                        Cpop[i].dou1[j]=Cpop[i].dou1[j]+k*(Cpop[i].high-Cpop[i].dou1[j])*Math.random();
+                    }else{
+                        Cpop[i].dou1[j]=Cpop[i].dou1[j]-k*(Cpop[i].dou1[j]-Cpop[i].low)*Math.random();
+                    }
+                    if (Cpop[i].dou1[j]>=Cpop[i].high){
+                        Cpop[i].dou1[j]=Cpop[i].high-0.01;
+                    }else if(Cpop[i].dou1[j]<=Cpop[i].low){
+                        Cpop[i].dou1[j]=Cpop[i].low+0.01;
+                    }
+                }
+
+            }
+            Cpop[i].calF();//重新计算个体的函数值
+        }
+    }
+    private void generate(){
+        //更新子代种群，并且进行精英保留机制的迭代
+        //精英保留机制原则，根据帕累托等级和距离进行排序，然后对其中的解进行精英选择，生成新的种群
+        if(debug) System.out.println(("程序开始迭代"));
+        //fast_Nondominated_sort(Cpop);//对子代种群进行非支配排序
+        //Cpop=calCrowing(Cpop);//对子代种群的拥挤度进行计算
+        inidival[] p=new inidival[2*N];//临时数组用来存放2n两个种群所有的个体
+        for (int i=0;i<2*N;i++){
+            //在这里先建立一个数组，将那些东西都存进去
+            if (i<N){
+                p[i]=Ppop[i];
+            }else{
+                p[i]=Cpop[i-N];
+            }
+        }
+        p=fast_Nondominated_sort(p);//对p再次进行快速非支配排序
+        p=calCrowing(p);//计算p的拥挤度
+        //在这里使用冒泡排序，将总的数组优中选优
+
+        for (int i=0;i<p.length;i++){
+            //利用冒泡算法进行的排序，
+            //如果要想提高速度可以修改为快速排序
+            for (int j=0;j<p.length-i-1;j++){
+                if (p[j].rank > p[j+1].rank){
+                    // 交换位置,等级越高的越靠后面
+                    inidival temp = p[j];
+                    p[j] = p[j+1];
+                    p[j+1] = temp;
+                }else if ((p[j].rank==p[j+1].rank)&&(p[j].distance<p[j+1].distance)){
+                    //距离越小的越靠后
+                    inidival temp = p[j];
+                    p[j] = p[j+1];
+                    p[j+1] = temp;
+                }
+            }
+        }
+        for (int i=0;i<N;i++){
+            pop[i]=p[i];//产生新的种群
+        }
+        //pop=fast_Nondominated_sort(pop);
+        //pop=calCrowing(pop);
+        Cpop=new inidival[N];
+        Ppop=new inidival[N];
+    }
+    public void FindBest(){
+        if(debug) System.out.println(("程序开始寻找最优解"));
+        System.out.println(("程序开始寻找最优帕累托解"));
+        pop=fast_Nondominated_sort(pop);
+        for (int i=0;i<N;i++) {
+            if (pop[i].rank==1) {
+            System.out.println("[" + pop[i].fitness1 + "," + pop[i].fitness2 + "],");
+            //System.out.println(pop[i].distance);
+            }
+        }
+
+    }
+    public void run(){
+        this.init();
+        pop=this.fast_Nondominated_sort(pop);//快速非支配排序
+        pop=this.calCrowing(pop);//拥挤度计算
+        for (int i=0;i<round;i++){
+            //开始迭代
+            choose();//选择
+            Crosser();//交叉
+            Mutation();//变异
+            generate();//迭代
+            FindBest();
+        }
+
+
+    }
+
+    public static void main(String args[]){
+        populations p=new populations();
+        p.run();
+    }
+}
